@@ -38,7 +38,7 @@ def authenticate_gmail():
     token_b64 = os.environ.get("GOOGLE_TOKEN_PICKLE")
 
     if token_b64:
-        creds = pickle.loads(base64.b64decode(token_b64))
+        creds = pickle.loads(base64.b64decode(token_b64.strip()))
 
     # --------------------------------------------------
     # LOCAL PATH: load from file
