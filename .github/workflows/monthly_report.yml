@@ -24,9 +24,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Debug secrets presence
+        env:
+          GOOGLE_TOKEN_PICKLE: ${{ secrets.GOOGLE_TOKEN_PICKLE }}
+        run: |
+          if [ -z "$GOOGLE_TOKEN_PICKLE" ]; then
+            echo "❌ GOOGLE_TOKEN_PICKLE is EMPTY or not set"
+          else
+            echo "✅ GOOGLE_TOKEN_PICKLE is set (length: ${#GOOGLE_TOKEN_PICKLE})"
+          fi
+
       - name: Run monthly report
         env:
-          GMAIL_TOKEN: ${{ secrets.GOOGLE_TOKEN_PICKLE }}
+          GOOGLE_TOKEN_PICKLE: ${{ secrets.GOOGLE_TOKEN_PICKLE }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           SENDER_EMAIL: ${{ secrets.EMAIL_ADDRESS }}
           SENDER_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
