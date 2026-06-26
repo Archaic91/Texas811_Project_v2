@@ -1,4 +1,5 @@
 import datetime
+import os
 import pandas as pd
 
 from gmail_client import authenticate_gmail, fetch_messages, get_email_body
@@ -60,6 +61,27 @@ def main():
         print("⚠ No data found")
         return
 
+    # --------------------------------------------------
+    # Read sensitive values from environment variables
+    # --------------------------------------------------
+    sender_email = os.environ.get("SENDER_EMAIL") or os.environ.get("EMAIL_ADDRESS")
+    sender_password = os.environ.get("SENDER_PASSWORD") or os.environ.get("EMAIL_PASSWORD")
+
+    # REPORT_RECIPIENTS can be a comma-separated string in the secret,
+    # e.g. "randy@pipelineoperators.com,john@pipelineoperators.com"
+    recipients_env = os.environ.get("REPORT_RECIPIENTS")
+    recipients = (
+        [r.strip() for r in recipients_env.split(",") if r.strip()]
+        if recipients_env
+        else RECIPIENTS
+    )
+
+    if not sender_email or not sender_password:
+        raise RuntimeError(
+            "Missing EMAIL_ADDRESS or EMAIL_PASSWORD environment variables. "
+            "Set them as GitHub Secrets (or in your local .env)."
+        )
+
     data_bundle = {
         "potx": data[data["Contractor Code"] == "POTX01"].copy(),
         "cowboy": data[data["Contractor Code"] == "COWBOY01"].copy(),
@@ -70,9 +92,9 @@ def main():
     result = run_reporting_pipeline(
         data_bundle,
         auto_email=True,
-        recipients=RECIPIENTS,
-        sender_email="rframe2010@gmail.com",
-        sender_password="wswc qsai bkeg efmv"
+        recipients=recipients,
+        sender_email=sender_email,
+        sender_password=sender_password
     )
 
     print("✔ Pipeline Complete")

@@ -1,6 +1,8 @@
 import os
+import json
 import pickle
 import base64
+import tempfile
 import time
 
 from googleapiclient.discovery import build
@@ -21,29 +23,68 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 def authenticate_gmail():
     """
-    Handles OAuth login + token refresh safely
+    Handles OAuth login + token refresh.
+
+    In GitHub Actions (CI): reads token from GOOGLE_TOKEN_PICKLE env var
+    (base64-encoded pickle) and credentials from GOOGLE_CREDENTIALS env var (JSON string).
+    Locally: falls back to token.pickle file and credentials.json, runs browser flow if needed.
     """
 
     creds = None
 
-    if os.path.exists("token.pickle"):
+    # --------------------------------------------------
+    # CI PATH: load token from environment variable
+    # --------------------------------------------------
+    token_b64 = os.environ.get("GOOGLE_TOKEN_PICKLE")
+
+    if token_b64:
+        creds = pickle.loads(base64.b64decode(token_b64))
+
+    # --------------------------------------------------
+    # LOCAL PATH: load from file
+    # --------------------------------------------------
+    elif os.path.exists("token.pickle"):
         with open("token.pickle", "rb") as token:
             creds = pickle.load(token)
 
-    if not creds or not creds.valid:
+    # --------------------------------------------------
+    # Refresh if expired (works in both CI and local)
+    # --------------------------------------------------
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
 
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+        # Persist refreshed token locally if running locally
+        if not token_b64 and os.path.exists("token.pickle"):
+            with open("token.pickle", "wb") as token:
+                pickle.dump(creds, token)
 
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
-                SCOPES
+    # --------------------------------------------------
+    # Interactive browser flow (local only, never in CI)
+    # --------------------------------------------------
+    elif not creds or not creds.valid:
+        if os.environ.get("CI"):
+            raise RuntimeError(
+                "No valid Gmail token found in CI environment. "
+                "Set the GOOGLE_TOKEN_PICKLE secret. See README for setup steps."
             )
-            creds = flow.run_local_server(port=0)
+
+        # Write credentials.json from env var if provided, otherwise use file
+        creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+        if creds_json:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+                tmp.write(creds_json)
+                creds_file = tmp.name
+        else:
+            creds_file = "credentials.json"
+
+        flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
+        creds = flow.run_local_server(port=0)
 
         with open("token.pickle", "wb") as token:
             pickle.dump(creds, token)
+
+        if creds_json:
+            os.unlink(creds_file)
 
     return build("gmail", "v1", credentials=creds)
 
