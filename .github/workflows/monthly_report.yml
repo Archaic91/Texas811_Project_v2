@@ -1,0 +1,42 @@
+name: Texas811 Monthly Reports
+
+on:
+  schedule:
+    # Runs at 8:00 AM CST on the 1st day of every month
+    - cron: '0 14 1 * *'
+
+  workflow_dispatch:
+
+jobs:
+  monthly-report:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Monthly Report
+        env:
+          EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
+        run: |
+          python run_monthly_report.py
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: Texas811-Reports
+          path: Reports/
